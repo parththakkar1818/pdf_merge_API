@@ -3,3 +3,4 @@ fastapi-socketio==0.0.10
 uvicorn==0.20.0
 PyPDF2
 python-multipart
+io
