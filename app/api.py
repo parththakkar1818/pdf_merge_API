@@ -4,7 +4,10 @@ from fastapi import FastAPI, File, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
 from PyPDF2 import PdfMerger
 import os
-from fastapi.responses import FileResponse
+from fastapi.responses import FileResponse, StreamingResponse
+
+from io import BytesIO
+
 
 
 app = FastAPI()
@@ -41,24 +44,37 @@ def create_upload_folder():
         os.makedirs(UPLOAD_FOLDER)
 
 @app.post('/merge')
-async def merge(pdfs: List[UploadFile] = File(...)):
-    create_upload_folder()
-
+async def merge(files: List[UploadFile] = File(...)):
+    # Merge PDF files in memory
     merger = PdfMerger()
-    filenames = []
+    for pdf in files:
+        pdf_bytes = await pdf.read()
+        merger.append(BytesIO(pdf_bytes))
 
-    for pdf in pdfs:
-        if pdf and allowed_file(pdf.filename):
-            filename = os.path.join(UPLOAD_FOLDER, pdf.filename)
-            with open(filename, 'wb') as f:
-                f.write(pdf.file.read())
-            filenames.append(pdf.filename)
-            merger.append(filename)
+    merged_pdf_bytes = BytesIO()
+    merger.write(merged_pdf_bytes)
+    merged_pdf_bytes.seek(0)
 
-    output_filename = 'merged.pdf'
-    output_filepath = os.path.join(UPLOAD_FOLDER, output_filename)
+    return StreamingResponse(merged_pdf_bytes, media_type="application/pdf", headers={"Content-Disposition": "attachment; filename=merged.pdf"})
 
-    with open(output_filepath, 'wb') as output_file:
-        merger.write(output_file)
+# async def merge(pdfs: List[UploadFile] = File(...)):
+#     create_upload_folder()
 
-    return FileResponse(output_filepath, filename=output_filename)
+#     merger = PdfMerger()
+#     filenames = []
+
+#     for pdf in pdfs:
+#         if pdf and allowed_file(pdf.filename):
+#             filename = os.path.join(UPLOAD_FOLDER, pdf.filename)
+#             with open(filename, 'wb') as f:
+#                 f.write(pdf.file.read())
+#             filenames.append(pdf.filename)
+#             merger.append(filename)
+
+#     output_filename = 'merged.pdf'
+#     output_filepath = os.path.join(UPLOAD_FOLDER, output_filename)
+
+#     with open(output_filepath, 'wb') as output_file:
+#         merger.write(output_file)
+
+#     return FileResponse(output_filepath, filename=output_filename)
